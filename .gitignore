@@ -1,0 +1,22 @@
+# --- 資料檔:內部日誌統計,絕對不要上傳 ---
+data.json
+data-backup*.json
+etka_data.json
+etka_data.csv
+*.pdf
+
+# --- 可重新產生的檔案 ---
+NotoSansTC.ttf
+etka_report.pdf
+venv/
+__pycache__/
+*.pyc
+
+# --- 打包與暫存 ---
+*.zip
+etka-parser/
+service-ui*.html
+preview-*.html
+
+# --- macOS ---
+.DS_Store
