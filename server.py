@@ -15,6 +15,7 @@ CNNewsTraffic — 本機網頁服務
 import base64
 import json
 import math
+import os
 import secrets
 import shutil
 import subprocess
@@ -172,7 +173,29 @@ def qs(lang, **kw):
 
 # ---------- 資料存取 ----------
 
+# 有設 DATABASE_URL(例如部署在 Groovedeploy)就存進 Postgres,重啟/重新部署也不會遺失。
+# 沒設(本機執行)就照舊只用同目錄的 data.json。
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
+
+
+def _db():
+    import psycopg
+    conn = psycopg.connect(DATABASE_URL, autocommit=True)
+    conn.execute("CREATE TABLE IF NOT EXISTS app_state "
+                 "(key text PRIMARY KEY, value text NOT NULL)")
+    return conn
+
+
+def _write_file(months: list):
+    DATA.write_text(json.dumps(months, ensure_ascii=False, indent=1), encoding="utf-8")
+
+
 def load() -> list:
+    if DATABASE_URL:
+        with _db() as conn:
+            row = conn.execute(
+                "SELECT value FROM app_state WHERE key = 'months'").fetchone()
+        return json.loads(row[0]) if row else []
     if DATA.exists():
         try:
             return json.loads(DATA.read_text(encoding="utf-8"))
@@ -182,7 +205,21 @@ def load() -> list:
 
 
 def save(months: list):
-    DATA.write_text(json.dumps(months, ensure_ascii=False, indent=1), encoding="utf-8")
+    if DATABASE_URL:
+        with _db() as conn:
+            conn.execute(
+                "INSERT INTO app_state (key, value) VALUES ('months', %s) "
+                "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
+                (json.dumps(months, ensure_ascii=False),))
+    _write_file(months)
+
+
+def clear():
+    if DATABASE_URL:
+        with _db() as conn:
+            conn.execute("DELETE FROM app_state WHERE key = 'months'")
+    if DATA.exists():
+        DATA.unlink()
 
 
 def merge(existing: list, incoming: list) -> list:
@@ -677,6 +714,7 @@ def report(lang: str = "zh"):
     months = load()
     if not months:
         return RedirectResponse(f"/?msg={T['no_data_pdf']}&err=1{suffix}", status_code=303)
+    _write_file(months)  # 報告程式讀 data.json,先確保內容是最新的
     out = BASE / "etka_report.pdf"
     # 在子行程產生 PDF:matplotlib 在 web worker 執行緒中不穩定,會拖垮整個服務
     proc = subprocess.run(
@@ -709,8 +747,7 @@ def data_json():
 
 @app.post("/reset")
 def reset():
-    if DATA.exists():
-        DATA.unlink()
+    clear()
     return RedirectResponse("/?msg=" + STRINGS["zh"]["cleared"], status_code=303)
 
 
