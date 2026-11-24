@@ -3,7 +3,7 @@
 
 [phases.setup]
 # pdftotext, needed to read PDF logs
-aptPkgs = ["...", "poppler-utils"]
+nixPkgs = ["...", "poppler_utils"]
 
 [start]
 # Listen on all interfaces inside the container and require the login.
