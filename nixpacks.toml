@@ -1,0 +1,11 @@
+# Build settings for Groovedeploy (nixpacks).
+# Local use is unchanged: `python3 server.py` still works as before.
+
+[phases.setup]
+# pdftotext, needed to read PDF logs
+aptPkgs = ["...", "poppler-utils"]
+
+[start]
+# Listen on all interfaces inside the container and require the login.
+# APP_PASSWORD is set as a hidden env var on Groovedeploy, never in git.
+cmd = "sh -c 'exec python server.py --host 0.0.0.0 --port 8000 --user etka --password \"$APP_PASSWORD\"'"
